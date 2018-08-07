@@ -1,4 +1,4 @@
-function [ vertsTransformed, X ] = nricp( Source, Target, Options )
+function [ vertsTransformed, X, assignment ] = nricp( Source, Target, Options )
 % nricp performs an adaptive stiffness variant of non rigid ICP.
 %
 % This function deforms takes a dense set of landmarks points from a template
@@ -12,10 +12,7 @@ function [ vertsTransformed, X ] = nricp( Source, Target, Options )
 %
 % Inputs:
 %   Source: structured object with fields - 
-%       Source.vertices: V x 3 vertices of template model
-%       Source.faces: F x 3 list of connected vertices.
-%       Source.normals: (Optional) FV x 3 list of surface normals. Make
-%           sure to set Options.normals = 1 if using normals.
+%       Source : V x 3 vertices of template model
 % 
 %   Target : stuctured object as above for target model.
 % 
@@ -35,10 +32,15 @@ function [ vertsTransformed, X ] = nricp( Source, Target, Options )
 %           plotted.
 %       rigidInit : logical, specifies that rigid ICP should be performed
 %           first before allowing non-rigid and non-global deformations.
+%       useHungarian : one-to-one alignment. when you use this as search
+%           meethod, you don't need to set biDirectional or stiffFromTarget as
+%           true. use knn when it is set 0
+%       useAuction : another one-to-one alignment method, which is faster
 %
 % Outputs:
 %   vertsTransformed : N X 3 vertices of transformed source mesh,
 %   X : (4N) X 3 stacked matrix of transformations.
+%   assignment : 1 * N Matrix of corresponded target index
 
 % Set default parameters
 if ~isfield(Options, 'gamm')
@@ -48,19 +50,22 @@ if ~isfield(Options, 'epsilon')
     Options.epsilon = 1e-4;
 end
 if ~isfield(Options, 'lambda')
-    Options.lambda = 2;
+    Options.lambda = 10;
 end
 if ~isfield(Options, 'alphaSet')
-    Options.alphaSet = linspace(10, 1, 1);
+    Options.alphaSet = linspace(1, 1, 2);
 end
 if ~isfield(Options, 'beta')
-    Options.betaSet = linspace(1, 2, 1);
+    Options.betaSet = linspace(1, 2, 2);
 end
 if ~isfield(Options, 'stiffFromTarget')
     Options.stiffFromTarget = 0;
 end
-if ~isfield(Options, 'elasticity')
-    Options.elasticity = 0;
+if ~isfield(Options, 'useHungarian ')
+    Options.useHungarian  = 0;
+end
+if ~isfield(Options, 'useAuction ')
+    Options.useAuction  = 0;
 end
 if ~isfield(Options, 'biDirectional')
     Options.biDirectional = 1;
@@ -73,22 +78,23 @@ if ~isfield(Options, 'rigidInit')
 end
 
 % Get source vertices 
-vertsSource = Source.vertices;
+vertsSource = Source;
 nVertsSource = size(vertsSource, 1);
 
 % Get target vertices
-vertsTarget = Target.vertices;
+vertsTarget = Target;
 
 
 % Optionally plot source and target surfaces
 if Options.plot == 1
+    Color = jet(nVertsSource);
     clf;
-    p = scatter3(vertsTarget(:,1), vertsTarget(:,2), vertsTarget(:,3),'+', 'y');
+    p = scatter3(vertsTarget(:,1), vertsTarget(:,2), vertsTarget(:,3), 36, Color, '+');
     hold on;
     
-    h = scatter3(vertsSource(:,1),vertsSource(:,2), vertsSource(:,3),'filled', 'b');
+    h = scatter3(vertsSource(:,1),vertsSource(:,2), vertsSource(:,3), 36, Color, 'filled');
     material dull; light; grid on; xlabel('x'); ylabel('y'); zlabel('z');
-    %view([60,30]); axis equal; axis manual;
+    view([60,30]); axis equal; axis manual;
     legend('Target', 'Source', 'Location', 'best')
     drawnow;
 end
@@ -169,6 +175,7 @@ for i = 1:nAlpha
     alpha = Options.alphaSet(i);
     beta = Options.betaSet(i);
     
+ 
     % set oldX to be very different to X so that norm(X - oldX) is large on 
 	% first iteration
 	oldX = 10*X;
@@ -190,8 +197,20 @@ for i = 1:nAlpha
         % Determine closest points on target U to transformed source points
        %% To adapt the cost function to fixed correspondences, only the first term has to be changed. 
         % 将target按照最近点的距离重新排序 最近点可能重复
-        targetId = knnsearch(vertsTarget, vertsTransformed);
-        nUncorrPnts(targetId)
+        if i == nAlpha && Options.useAuction == 1
+            dis = pdist2(vertsTransformed, vertsTarget);
+            disMax = -dis + max(max(dis));
+            min(min(disMax));
+            costmat = double(disMax*100);    
+            targetId = sparseAssignmentProblemAuctionAlgorithm(costmat);    
+            prin = 'arrived Auction here'
+        elseif i == nAlpha && Options.useHungarian == 1
+            dis = pdist2(vertsTransformed, vertsTarget);
+            targetId = munkres(dis);
+        else
+            targetId = knnsearch(vertsTarget, vertsTransformed);
+        end
+        uncorresponded1 = nUncorrPnts(targetId)
         U = vertsTarget(targetId,:);
         kron_M_G = alpha .* kron_M_G;
         % Update weight matrix  通过获取 B 的列并沿 d 指定的对角线放置它们，来创建一个 m×n 稀疏矩阵
@@ -201,7 +220,7 @@ for i = 1:nAlpha
         % Get closest points on source tarD to target samples samplesTarget
         if Options.biDirectional == 1
             transformedId = knnsearch(vertsTransformed, samplesTarget);
-            nUncorrPnts(transformedId)
+            uncorresponded2 = nUncorrPnts(transformedId)
             tarD = sparse(nSamplesTarget, 4 * nVertsSource);
             for j = 1:nSamplesTarget
                 cor = transformedId(j); % cor是source对应的索引，应该和X的顺序对应起来
@@ -255,6 +274,7 @@ end
 %sort(targetId)
 % Compute transformed points 
 vertsTransformed = D*X;
+assignment = targetId;
 
 % Update plot and remove target mesh
 if Options.plot == 1
