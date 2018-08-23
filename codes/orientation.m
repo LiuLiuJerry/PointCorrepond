@@ -1,16 +1,16 @@
+function []=orientation(formatSpec, filename, outfile, N)
 % 遍历找到对称的方向然后旋转到x轴
 % 若y<0 的方向是机尾，则再旋转180°
-close all;
-clear all;
-formatSpec = 'D:\\pointCloud\\%s\\airplane_0%d.ply';
-for ii=686:686
+% close all;
+% clear all;
+% formatSpec = 'D:\\pointCloud\\%s\\airplane_0%d.ply';
+for ii=679:679
     
-    path = sprintf(formatSpec,'gt_skeleton', ii);
+    path = sprintf(formatSpec, filename, ii);
     name = sprintf('airplane_0%d,ply', ii);
     ptCloud2 = pcread(path);
-    N = 2048;
     
-    Color = jet(2048);
+    Color = jet(N);
     %init symmerty
     xyz2 = ptCloud2.Location;
     xyz2(:, 1) = xyz2(:, 1)*-1;
@@ -51,10 +51,12 @@ for ii=686:686
     ptCloud1 = pointCloud(xyz1);
     ptCloud2 = pointCloud(xyz2);
     
-    tail1 = xyz2(1:100, :);
-    tail2 = xyz2(end-100:end, :);
-    v1 = sum( var(tail1(:, 1)) )
-    v2 = sum( var(tail2(:, 1)) )
+    %检查是不是尾巴在前面
+    n = N*0.1;
+    tail1 = xyz2(1:n, :);
+    tail2 = xyz2(end-n:end, :);
+    v1 = sum( var(tail1(:, 1)) );
+    v2 = sum( var(tail2(:, 1)) );
     if(v1 > v2)
         [ptCloud2, xyz] = rotate(pi, ptCloud2);
     end
@@ -67,7 +69,7 @@ for ii=686:686
     pcshow(ptCloud2.Location, Color);
     title(name);
     hold off
-    writePath = sprintf(formatSpec,'ort_skeleton_2048', ii);
+    writePath = sprintf(formatSpec, outfile, ii);
     pcwrite(ptCloud2, writePath);
 end
 
@@ -82,4 +84,6 @@ function [ptCloud, xyz2]=rotate(rad, ptCloud2)
         ptCloudTformed = pctransform(ptCloud2,tform1);
         xyz2 = ptCloudTformed.Location;
         ptCloud = pointCloud(xyz2);
+end
+
 end

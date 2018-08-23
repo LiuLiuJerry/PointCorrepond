@@ -1,12 +1,12 @@
-formatSpec = 'D:\\pointCloud\\%s\\airplane_0%d.ply';
+formatSpec = 'D:\\GitHub\\data\\SkeletonsbyJerry\\%s\\airplane_0%d.2048.ply';
+filename = 'airplane';
 ii=686
     
-path = sprintf(formatSpec,'gt_skeleton', ii);
-name = sprintf('airplane_0%d,ply', ii);
+path = sprintf(formatSpec,filename, ii);
 ptCloud2 = pcread(path);
 xyz2 = ptCloud2.Location;
-xyz2 = sortrows(xyz2, 2);
+xyz2 = sortrows(xyz2, 1);
 ptCloud = pointCloud(xyz2);
     
-writePath = sprintf(formatSpec,'gt_skeleton', 10000);
+writePath = path;
 pcwrite(ptCloud, writePath);

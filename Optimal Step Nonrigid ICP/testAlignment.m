@@ -1,8 +1,9 @@
+%%单纯进行一对一匹配，不进行变形
 clear all;
 useMunkre = 0;
 
-formatSpec = 'D:\\GitHub\\pointCloud\\data\\%s\\airplane_0%d.ply';
-folder = 'ort_skeleton_2048';
+formatSpec = 'D:\\GitHub\\data\\%s\\airplane_0%d.2048.ply';
+folder = 'SkeletonsbyJerry\\airplane_ort';
 % folder = 'gt_skeleton';
 path1 = sprintf(formatSpec, folder, 627);
 path2 = sprintf(formatSpec, folder, 638);
