@@ -220,7 +220,7 @@ for i = 1:nAlpha
             wVec = wVec .* (angle<pi/4);
         end
             
-        % Update weight matrix
+        % Update weight matrix 序号为0的对角线放置wVec
         W = spdiags(wVec, 0, nVertsSource, nVertsSource);
 
         % Get closest points on source tarD to target samples samplesTarget

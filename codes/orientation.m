@@ -1,19 +1,20 @@
-function []=orientation(formatSpec, filename, outfile, N)
+function []=orientation(formatSpec, filename, outfile, idx)
 % 遍历找到对称的方向然后旋转到x轴
 % 若y<0 的方向是机尾，则再旋转180°
 % close all;
 % clear all;
 % formatSpec = 'D:\\pointCloud\\%s\\airplane_0%d.ply';
-for ii=679:679
+for ii=idx
     
     path = sprintf(formatSpec, filename, ii);
     name = sprintf('airplane_0%d,ply', ii);
     ptCloud2 = pcread(path);
     
-    Color = jet(N);
     %init symmerty
     xyz2 = ptCloud2.Location;
     xyz2(:, 1) = xyz2(:, 1)*-1;
+    N = size(xyz2,1);
+    Color = jet(N);
     [D, I] = pdist2(ptCloud2.Location, xyz2,'euclidean', 'Smallest', 1);
     %D = pdist2(ptCloud2.Location, xyz2,'euclidean');
     mindis = sum(D);

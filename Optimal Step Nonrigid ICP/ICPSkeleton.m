@@ -39,7 +39,7 @@ xyzt = ptCloudt.Location;
 Options.plot = 1;
 Options.stiffFromTarget = 0;
 Options.useHungarian = 0;
-Options.useAuction = 1;
+Options.useAuction = 0;
 Options.biDirectional = 1;
 
 pointsTransformed = Source;
