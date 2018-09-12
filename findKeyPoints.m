@@ -1,4 +1,9 @@
-function [seg, xyz, dir, parts, importantpts, keypts_idx, boundary_idx] = segment(xyz, k, thre, r)
+function [xyz, seg, dir, parts, importantpts, keypts_idx, boundary_idx] = findKeyPoints(xyz, P, thre, r)
+%% parameters
+
+% thre: thresold for important points
+% r: search redius
+
 % %读文件
 % clear all;
 % close all;
@@ -12,30 +17,42 @@ function [seg, xyz, dir, parts, importantpts, keypts_idx, boundary_idx] = segmen
 % ptCloud = pcread(path);
 % xyz = ptCloud.Location;
 
+    N = size(xyz,1);
 % 最小生成树，找边界点
     dists = pdist2(xyz, xyz);
     gra = graph(dists); %距离作为边的权重
-    g = minspantree(gra);% 最小生成树
-    D = degree(g);
+    G = minspantree(gra);% 最小生成树
+    A = P.spls_adj;
+    D = degree(G);
     
     %计算点的方向 pca
     importantpts = [];
     % 可以换为serchradius
+    k = 5;
     [idx_n, ~] = knnsearch(xyz, xyz, 'K', k);
     nei_idx = (dists < r);
-    N = size(xyz,1);
+%     nei_idx = nei_idx | A;
+    nei_idx = A | diag(ones(N, 1));
+
     dir = zeros(N, 3);
     neighbors = {};
-    for i = 1:N
-        idx = find(nei_idx(:,i));
-         %度为1才可以至少有一个邻居，否则至少有两个邻居
-        if size(idx,1) < 2 
-            idx = idx_n(i, 1:2);
-            nei_idx(i, idx(2)) = 1;
-            nei_idx(idx(2), i) = 1;
-            
-        end       
-    end
+%     % 找邻居
+%     for i = 1:N
+%         idx = find(nei_idx(:,i));
+%          %度为1才可以至少有一个邻居，否则至少有两个邻居
+%          if size(idx, 1) < 3 && D(i) > 1
+%              idx = idx_n(i, 1:3);
+%              nei_idx(i, idx(2)) = 1;
+%              nei_idx(idx(2), i) = 1;   
+%              nei_idx(i, idx(3)) = 1;
+%              nei_idx(idx(3), i) = 1; 
+%          elseif size(idx,1) < 2 && D(i) == 1
+%             idx = idx_n(i, 1:2);
+%             nei_idx(i, idx(2)) = 1;
+%             nei_idx(idx(2), i) = 1;
+%   
+%         end       
+%     end
     for i = 1:N       
         % 最少取一个邻居就可以了，太远的不要
 %         [idx, dis] = findNeighborsInRadius(pointCloud(xyz), xyz(i,:), r, 'Sort', true);

@@ -24,7 +24,7 @@ function [seg, pend] = tag(seg, dir, idx_n, ii, t)
         ang = abs(sum(dir(ii,:).*dir_nei, 2)); %列向量
 
         % 下一个被标记的点应该是方向满足要求的条件下距离最近的
-        if ang > 0.707
+        if ang > 0.866
            j = idx_nei(1);
            [seg, pend] = tag(seg, dir, idx_n, j, t);
         end
