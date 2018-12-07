@@ -1,4 +1,4 @@
-function [ vertsTransformed, X, assignment ] = nricp_ske( Source, Target, Options)
+function [ vertsTransformed, X, assignment ] = nricp_head( Source, Target, Options)
 % nricp performs an adaptive stiffness variant of non rigid ICP.
 %
 % 按照关键点分割后的，带有法向的点之间的配准，多了一些约束条件，效果好像不怎么样
@@ -7,11 +7,8 @@ function [ vertsTransformed, X, assignment ] = nricp_ske( Source, Target, Option
 % Inputs:
 %   Source: structured object with fields - 
 %       Source : V x 3 vertices of template model
-%       vertices: vertexes
-%       parts
-%       directions
-%       key_idx
-%       boundary_idx
+%       vertices: vertexes 注意必须是double
+%       Normals
 % 
 %   Target : stuctured object as above for target model.
 % 
@@ -46,13 +43,13 @@ if ~isfield(Options, 'gamm')
     Options.gamm = 1;
 end
 if ~isfield(Options, 'epsilon')
-    Options.epsilon = 1e-4;
+    Options.epsilon = 1e-3;
 end
 if ~isfield(Options, 'lambda')
     Options.lambda = 10;
 end
 if ~isfield(Options, 'alphaSet')
-    Options.alphaSet = linspace(1, 1, 2);%stiffness parameters. 
+    Options.alphaSet = linspace(1.5, 1, 1);%stiffness parameters.平均分两份 
 end
 if ~isfield(Options, 'beta')
     Options.betaSet = linspace(1, 2, 2);
@@ -61,7 +58,7 @@ if ~isfield(Options, 'stiffFromTarget')
     Options.stiffFromTarget = 0;
 end
 if ~isfield(Options, 'useHungarian ')
-    Options.useHungarian  = 1;
+    Options.useHungarian  = 0;
 end
 if ~isfield(Options, 'useAuction ')
     Options.useAuction  = 0;
@@ -82,7 +79,7 @@ if ~isfield(Options, 'onlyKeyPoints')
     Options.onlyKeyPoints = 1;
 end
 if ~isfield(Options, 'dirWeighting')
-    Options.dirWeighting = 1;
+    Options.dirWeighting = 0;
 end
 % Get source vertices 
 vertsSource = Source.vertices;
@@ -92,12 +89,8 @@ nVertsSource = size(vertsSource, 1);
 vertsTarget = Target.vertices;
 nVertsTarget = size(vertsTarget, 1);
 
-dirSource = Source.directions;
-dirTarget = Target.directions;
-partsS = Source.parts;  partsT = Target.parts;
-key_idxS = Source.key_idx;   key_idxT = Target.key_idx; 
-boundary_idxS = Source.boundary; boundary_idxT = Target.boundary;
-
+dirSource = Source.normals;
+dirTarget = Target.normals;
 
 % Optionally plot source and target surfaces
 if Options.plot == 1
@@ -106,14 +99,9 @@ if Options.plot == 1
 %     p = scatter3(vertsTarget(:,1), vertsTarget(:,2), vertsTarget(:,3), 36, jet(nVertsTarget), '+');
     p = scatter3(vertsTarget(:,1), vertsTarget(:,2), vertsTarget(:,3), 36, 'r', '+');
     hold on;
-        
-    if Options.onlyKeyPoints == 1
-        verts = vertsSource([key_idxS; boundary_idxS], :);
-        h = scatter3(verts(:,1),verts(:,2), verts(:,3), 36, jet(size(verts, 1)), 'filled');
-    else
-%         h = scatter3(vertsSource(:,1),vertsSource(:,2), vertsSource(:,3), 36, jet(nVertsSource), 'filled');
-        h = scatter3(vertsSource(:,1),vertsSource(:,2), vertsSource(:,3), 36, 'b', 'filled');
-    end
+
+    h = scatter3(vertsSource(:,1),vertsSource(:,2), vertsSource(:,3), 36, 'b', 'filled');
+
     material dull; light; grid on; xlabel('x'); ylabel('y'); zlabel('z');
     view([60,30]); axis equal; axis manual;
     legend('Target', 'Source', 'Location', 'best')
@@ -140,11 +128,7 @@ diameter_S = sqrt(dot(rs,rs));
 DistS = pdist2(vertsSource, vertsSource);
 r = diameter_S*0.04;
 A = DistS < r;
-% 是不是还应该有关键点和关键边界之间的关系
-for i = partsS'
-    A(i(1), i(2)) = 1;
-    A(i(2), i(1)) = 1;
-end
+
 % 图关联矩阵 如果 s 和 t 是 G 中第 j 条边的源和目标节点的节点 ID，则 I(s,j) = -1 且 I(t,j) = 1。即 I 的每一列指示 G 中单条边的源和目标节点。
 M = adjacency2incidence(A)';
 
@@ -179,21 +163,14 @@ end
 if Options.rigidInit == 1
     disp('* Performing rigid ICP...');
     % logical: true or false
-%     if Options.onlyKeyPoints == 1
-    [R, t] = icp(vertsTarget(key_idxT,:)', vertsSource(key_idxS,:)', 50, 'Verbose', true, 'Matching', 'kDtree');
-%     else
-%     [R, t] = icp(vertsTarget', vertsSource', 50, 'Verbose', true, 'Matching', 'kDtree');
-%     end
+     [R, t] = icp(vertsTarget', vertsSource', 50, 'Verbose', true, 'Matching', 'kDtree');
+
     X = repmat([R'; t'], nVertsSource, 1);
     vertsTransformed = D*X;
     
     % Update plot
     if Options.plot == 1
         set(h, 'XData', vertsTransformed(:,1),'YData', vertsTransformed(:,2),'ZData', vertsTransformed(:,3));
-       if Options.onlyKeyPoints == 1
-            verts = vertsTransformed([key_idxS; boundary_idxS], :);
-            set(h, 'XData', verts(:,1), 'YData', verts(:,2), 'ZData', verts(:,3));
-        end
         drawnow;
     end
 else
@@ -234,11 +211,7 @@ for i = 1:nAlpha
         
         % Determine closest points on target U to transformed source points
        %% To adapt the cost function to fixed correspondences, only the first term has to be changed. 
-        % 将target按照最近点的距离重新排序 最近点可能重复
-        vertsT = vertsTarget(key_idxT, :);
-        vertsS = vertsTransformed(key_idxS, :);  
-        bdyVertsT = vertsTarget(boundary_idxT,:);
-        bdyVertsS = vertsTransformed(boundary_idxS, :);
+
         if i == nAlpha && Options.useAuction == 1
             if nVertsSource ~= nVertsTarget
                 disp('Sorry! the number of S and T must be same in Auction!');
@@ -254,42 +227,15 @@ for i = 1:nAlpha
         elseif Options.useHungarian == 1 
             dis = pdist2(vertsTransformed, vertsTarget);
             targetId = munkres(dis);
-            if Options.onlyKeyPoints == 1
-                dis_keypts = pdist2(vertsS, vertsT);
-                dis_keypts = dis_keypts.*(dis_keypts < r*20);
-                munkresT = munkres(dis_keypts);
-                targetId(key_idxS) = key_idxT(munkresT);
-                dis_bdypts = pdist2(bdyVertsS, bdyVertsT);
-                munkresbdyT = munkres(dis_bdypts);
-                targetId(key_idxS) = boundary_idxT(munkresbdyT); 
-            end
+
         else
             targetId = knnsearch(vertsTarget, vertsTransformed);
-            if Options.onlyKeyPoints == 1
-                knnT = knnsearch(vertsT, vertsS);
-                targetId(key_idxS) = key_idxT(knnT);
-
-                knnbdyT = knnsearch(bdyVertsT, bdyVertsS);
-                targetId(boundary_idxS) = boundary_idxT(knnbdyT);
-%                 dis_keypts = pdist2(vertsS, vertsT);
-%                 munkresT = munkres(dis_keypts);
-%                 targetId(key_idxS) = key_idxT(munkresT');
-%                 dis_bdypts = pdist2(bdyVertsS, bdyVertsT);
-%                 munkresbdyT = munkres(dis_bdypts);
-%                 targetId(boundary_idxS) = boundary_idxT(munkresbdyT'); 
-            end
-            
+           
         end
 %         uncorresponded1 = nUncorrPnts(targetId)
         U = vertsTarget(targetId,:);
         kron_M_G = alpha .* kron_M_G;
         % Update weight matrix  通过获取 B 的列并沿 d 指定的对角线放置它们，来创建一个 m×n 稀疏矩阵
-        % 可以用来强调或删除某些点的影响
-        if Options.onlyKeyPoints == 1
-            idx = 1:nVertsSource;
-            isKeypts = ismember(idx', [key_idxS; boundary_idxS] );
-            wVec = isKeypts;
-        end
         % Optionally transform surface normals to compare with target and
         % give zero weight if surface and transformed normals do not have
         % similar angles.
@@ -361,24 +307,9 @@ vertsTransformed = D*X;
 assignment = targetId;
 
 %% plot key points
-Target = Target(assignment, :);
-for ii = partsS'
-    plot3(Target(ii,1), Target(ii,2), Target(ii,3)); hold on;
-end
-% key points
-scatter3(Target(key_idxS, 1), Target(key_idxS, 2), Target(key_idxS, 3), 80, jet(size(key_idxS,1)), 'filled'); hold on;
-% boundary points
-scatter3(Target(boundary_idxS, 1), Target(boundary_idxS, 2), Target(boundary_idxS, 3), 80, jet(size(boundary_idxS,1)), 'filled'); hold on;
-    axis equal;
-    hold off;
-
 % Update plot and remove target mesh
 if Options.plot == 1
     set(h, 'XData', vertsTransformed(:,1),'YData', vertsTransformed(:,2),'ZData', vertsTransformed(:,3));
-    if Options.onlyKeyPoints == 1
-        verts = vertsTransformed([key_idxS; boundary_idxS], :);
-        set(h, 'XData', verts(:,1), 'YData', verts(:,2), 'ZData', verts(:,3));
-    end
     drawnow;
     pause(2);
 %     delete(p);

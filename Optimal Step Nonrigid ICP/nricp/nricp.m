@@ -1,4 +1,4 @@
-function [ vertsTransformed, X ] = nricp( Source, Target, Options )
+function [ vertsTransformed, X, assignment ]  = nricp( Source, Target, Options )
 % nricp performs an adaptive stiffness variant of non rigid ICP.
 %
 % This function deforms takes a dense set of landmarks points from a template
@@ -293,6 +293,7 @@ else
     vertsTransformed(wVec,:) = corTargets(wVec,:);
 end
 
+assignment = targetId;
 % Update plot and remove target mesh
 if Options.plot == 1
     set(h, 'Vertices', vertsTransformed);

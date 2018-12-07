@@ -1,6 +1,6 @@
 clear all;
 close all;
-%% 
+%% 骨架和提取骨架后得到的矩阵啊之类的
 formatSpec = 'D:/GitHub/data/Chen/Skeletons/%s/mesh_%.4d.ply';
 P_formatSpec = 'D:/GitHub/data/Chen/Skeletons/%s/mesh_%.4d_skeleton';
 idx = [0:47];
@@ -63,6 +63,7 @@ for i = 1:cnt_models
     x0_tmp = imptpts{i}([1,floor(end/2)+1,end]', :);
     x0_kpts(i, :) = x0_tmp(:);
 end
+% 先优化脊椎骨的关节点
 Xkpts = fmincon(@(X)fun_impdist(X, backbone, imptpts, n_imptpts), x0_kpts, [], [], [], [], [], [], @(X)nonlcon_imp(X,  imptpts, n_imptpts));
 
 %% 优化骨节连接点
@@ -104,6 +105,7 @@ VUB = [];
 legsf = [legsf_l, legsf_r];
 legsb = [legsb_l, legsb_r];
 % 传入坐标以前腿的坐标应该减去最开始的坐标
+% 优化腿和头的关节点
 Xh = fmincon(@(X)fun_dist(X, head, nbones_h), xh0, [], [], [], [], VLB, VUB, @(X)nonlcon(X, head, nbones_h));
 Xf = fmincon(@(X)fun_dist(X, legsf, nbones_leg), xf0, [], [], [], [], VLB, VUB, @(X)nonlcon(X, legsf, nbones_leg));
 Xb = fmincon(@(X)fun_dist(X, legsb, nbones_leg), xb0, [], [], [], [], VLB, VUB, @(X)nonlcon(X, legsb, nbones_leg));
@@ -170,6 +172,6 @@ for ii = 1:cnt_models
     xyz_tail = reshape(Xt(ii,:), [nbones_t, 3]);
 
     xyz = [kpts; xyz_heads; xyz_legsf_l; xyz_legsf_r; xyz_legsb_l; xyz_legsb_r; xyz_tail];
-    path_write = sprintf(formatSpec, 'horse_kpts',ii);
+    path_write = sprintf(formatSpec, 'horse_kpts',idx(ii));
     pcwrite(pointCloud(xyz), path_write);
 end
