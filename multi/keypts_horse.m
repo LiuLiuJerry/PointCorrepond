@@ -24,7 +24,7 @@ function [importantpts, parts, partslength] = keypts_horse(xyz, P, bplot)
 %     G = minspantree(gra);% 最小生成树
     self =  ~diag(ones(N,1));
     
-    A = P.spls_adj & self;
+    A = P.spls_adj & self; %使用原来的图计算
     Gra = graph(A);
     D = degree(Gra);
     
@@ -47,7 +47,7 @@ function [importantpts, parts, partslength] = keypts_horse(xyz, P, bplot)
         end
         for j = 2:size(nbs, 1)
             for k = 1:j-1
-                if dot(diri(j,:), diri(k,:)) > 0.98
+                if dot(diri(j,:), diri(k,:)) > 0.95 %如果方向相似并且前面已经有一个更接近的了 就放弃这个邻居
                     idxj = (nbs(j,1));
                     idxk = (nbs(k,1));
                     A(idxj,i) = 0;
@@ -71,7 +71,7 @@ function [importantpts, parts, partslength] = keypts_horse(xyz, P, bplot)
     %% 分割成头尾和四条腿
     idx_Start = find(D<2);
     npart = size(idx_Start, 1);
-    parts = cell(npart+1,1);
+    parts = cell(npart+1,1); %里面存的是每个part的顶点的编号
     partslength = zeros(npart,30);
     seg = zeros(size(xyz,1),1);
     for t = 1:npart
@@ -104,20 +104,53 @@ function [importantpts, parts, partslength] = keypts_horse(xyz, P, bplot)
         part = part(part > 0);
         parts{t} = part;
     end
-    pos = [[1:npart]', xyz(idx_Start,:), max(partslength,[],2)];
-    maxlen = max(pos(:,5));
-    pos = sortrows(pos, 5);
-    phead = pos(pos(:,5) < maxlen * 0.4, :);
-    if isempty(phead)
+    pos = [[1:npart]', xyz(idx_Start,:), max(partslength,[],2)]; %用每个部分的最后一个点表示这个part的位置
+    front_pos = pos(pos(:,4)>0.0,:); %准备在z值大于0的地方找头 对狮子是>0.15 对猫是0.0
+    front_pos = sortrows(front_pos, 5); %根据长度排序 最长的两个肯定是前腿
+    if size(front_pos,1) > 5
+        front_pos = front_pos(1:end-1,:);
+    end
+    max_len = max(front_pos(:,5));
+    % 找头
+    if size(front_pos,1)<=2
         idx_head = [];
     else
-        idx_head = phead(end,1);
+        %现在是长度小并且y最低的是头
+        front_pos = front_pos(front_pos(:,5)<max_len*0.6,:);
+        phead = sortrows(front_pos, 3);
+        idx_head = phead(1,1);
     end
-    pos = pos(pos(:,5) > maxlen * 0.4, :);
-    
-    pos = sortrows(pos, 4);
+    pos = pos(pos(:,5)>max_len*0.6, :); %排除掉刚刚考虑过的branch
+    if size(pos,1)>6
+        idx_to_del = ones(1,size(pos,1));
+        for i = 1:size(pos,1)
+            idx_parts = parts{pos(i,1)};%获取idx所表示的part
+            if size(idx_parts)<4
+                idx_to_del(i) = 0;
+            end
+        end
+        pos = pos(idx_to_del>0,:);
+    end
+    pos = sortrows(pos, 5);
+    pos = pos(end-4:end,:);
+    pos = sortrows(pos, 4);%以前是按照z轴排序 最后面的是尾巴
     idx_tail = pos(1,1);
-    fpos = pos(2:5,:);
+    max_cos = -1;
+    %现在是根据节点的方向 跟（0,1,0）方向比较接近的是尾巴
+    dir_y = [0,1,0];
+    for i = 1:size(pos,1)
+        idx_parts = parts{pos(i,1)};%获取idx所表示的part
+        pts = xyz(idx_parts,:);
+        dir = pts(end-2,:)-pts(end,:);
+        dir_cos = dot(dir_y, dir)/norm(dir_y)/norm(dir);
+        if max_cos < dir_cos
+            idx_tail = pos(i,1);
+            max_cos = dir_cos;
+        end
+    end
+    
+    fpos = pos(pos(:,1)~=idx_tail,:);
+
      %先 z排序 再x排序 x-z:(-1,-1),(-1,1),(1,-1),(1,1)右后，右前，左后，左前   
     fpos = sortrows(fpos, 2); % x排序 结果为从第一象限开始逆时针计算
     fpos(1:2, :) = sortrows(fpos(1:2,:), 4);
@@ -141,15 +174,18 @@ function [importantpts, parts, partslength] = keypts_horse(xyz, P, bplot)
 if bplot
     figure()
 %     scatter3(xyz(:,1), xyz(:,2), xyz(:,3), 15, 'filled'); hold on;
-    plot_skeleton(xyz, A, 'colorp',[0.8, 0.8, 0.8]);
+    plot_skeleton(xyz, A);%, 'colorp',[0.8, 0.8, 0.8]);
     for i = 1:npart+1
         idx = parts{i};
         pts = xyz(idx, :);
         scatter3(pts(:,1), pts(:,2), pts(:,3),  48, 'filled'); hold on;
+        if i == npart+1
+            scatter3(pts(:,1), pts(:,2), pts(:,3),  48,  'grey', 'filled'); hold on;
+        end
     end
     idx_Start = xyz(D<2,:);
     D_3 = xyz(D>2,:);
-    scatter3(idx_Start(:,1), idx_Start(:,2), idx_Start(:,3), 72, 'filled'); hold on;
+%     scatter3(idx_Start(:,1), idx_Start(:,2), idx_Start(:,3), 72, 'filled'); hold on;
     scatter3(D_3(:,1), D_3(:,2), D_3(:,3), 72, 'b', 'filled'); hold on;
     axis equal;
     xlabel('x')

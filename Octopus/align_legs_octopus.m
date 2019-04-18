@@ -9,7 +9,7 @@ init = [0,0,1];
 for i = 1:cnt_parts
     pmean = mean(xyz{i});
     pmean = pmean./norm(pmean);
-    if dot(pmean,init) > max_dot
+    if dot(pmean,init) > max_dot & pmean(1)<0
         max_dot = pmean(:,3);
         p = i;
     end

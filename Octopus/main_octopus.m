@@ -5,7 +5,7 @@ formatSpec = 'D:/GitHub/data/Octopus/skeletons/mesh_%.4d.ply';
 W_formatSpec = 'D:/GitHub/data/Octopus/final/mesh_%.4d.ply';
 P_formatSpec = 'D:/GitHub/data/Octopus/skeletons/mesh_%.4d_skeleton';
 % 目前只有5-40可以用, 56-58, 60:112
-idx = [84];
+idx = [20];
 
 % 声明数据
 N = size(idx, 2);
@@ -149,36 +149,42 @@ for i = 1:cnt_models
 end
 
 %% plot
+C = jet(cnt_leg+1);
+%C = hsv(cnt_leg+1);
 for ii = 1:cnt_models
-    figure(idx(ii)+100);
+    h1 = figure(idx(ii)+100);
+    set( h1, 'Color','w')
     aligned_xyz = aligned_xyz_models{ii}; 
 %     scatter3(xyz_model(:,1), xyz_model(:,2), xyz_model(:,3), 15, 'filled'); hold on;
+
     for j = 1:cnt_leg+1
         p = aligned_xyz{j};
-        scatter3(p(:,1), p(:,2), p(:,3), 15, 'filled'); hold on;
+        %scatter3(p(:,1), p(:,3), p(:,2), 15, 'filled'); hold on;
+        plot3(p(:,3), p(:,1), p(:,2), '.-', 'LineWidth', 5, 'MarkerSize', 42, 'Color', C(j,:)); hold on;
     end
     xlabel('x')
     ylabel('y')
     zlabel('z')
     axis equal;
+    axis off;
     hold off;
 end
-%% write down
-n_pts = nsample*cnt_leg+nsample_head;
-for ii = 1:cnt_models
-    % key points
-    pts = zeros(n_pts, 3);
-    aligned_xyz = aligned_xyz_models{ii}; 
-    for j = 1:cnt_leg
-        p = aligned_xyz{j};
-        n1 = j*nsample-nsample+1;
-        n2 = j*nsample;
-        pts(n1:n2,:) = p;
-    end
-    pts(end-nsample_head+1:end,:) = aligned_xyz{9};
-    path_write = sprintf(W_formatSpec, idx(ii));
-    pcwrite(pointCloud(pts), path_write);
-end
+% %% write down
+% n_pts = nsample*cnt_leg+nsample_head;
+% for ii = 1:cnt_models
+%     % key points
+%     pts = zeros(n_pts, 3);
+%     aligned_xyz = aligned_xyz_models{ii}; 
+%     for j = 1:cnt_leg
+%         p = aligned_xyz{j};
+%         n1 = j*nsample-nsample+1;
+%         n2 = j*nsample;
+%         pts(n1:n2,:) = p;
+%     end
+%     pts(end-nsample_head+1:end,:) = aligned_xyz{9};
+%     path_write = sprintf(W_formatSpec, idx(ii));
+%     pcwrite(pointCloud(pts), path_write);
+% end
 
 % %% write edge down
 % n_pts = nsample*cnt_leg+nsample_head;

@@ -1,4 +1,6 @@
 function xyz = symmetry(xyz)
+%% 把提取到的骨架变成完全左右对称的骨架
+%  即左右侧信息互相补全
 %     xyz = ptCloud.Location;
     bbox = [ptCloud.XLimits; ptCloud.YLimits; ptCloud.ZLimits];
     rs = bbox(:,1)-bbox(:,2);
